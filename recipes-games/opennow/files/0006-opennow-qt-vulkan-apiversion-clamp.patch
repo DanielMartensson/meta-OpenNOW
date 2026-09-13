@@ -1,0 +1,32 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Watermelon OS <build@watermelon-wine-1a>
+Date: Sun, 13 Sep 2026 19:30:00 +0200
+Subject: [PATCH] qt: clamp adopted Vulkan apiVersion so Qt never renders in software
+
+A native backend may report apiVersion 0 when it cannot determine the Vulkan API
+version of the adopted device. Qt rejects a zero VkApplicationInfo::apiVersion and
+silently falls back to software rendering (llvmpipe) even though the hardware
+supports Vulkan 1.3. Clamp a zero apiVersion to the lowest version the adoption
+path is built against (VK_API_VERSION_1_1) before Qt adopts the native instance.
+
+This fix is intentionally generic: it does not reference any vendor, driver or SoC,
+so it applies to every OpenNOW target, not just the STM32MP2-based board.
+
+---
+diff --git a/opennow-qt/src/streaming/rendering/LinuxVulkanGraphics.cpp b/opennow-qt/src/streaming/rendering/LinuxVulkanGraphics.cpp
+index 69d162e9..f3d5fa85 100644
+--- a/opennow-qt/src/streaming/rendering/LinuxVulkanGraphics.cpp
++++ b/opennow-qt/src/streaming/rendering/LinuxVulkanGraphics.cpp
+@@ -61,6 +61,12 @@ bool Device::initialize()
+     m_info.version = OPENNOW_STREAMER_VULKAN_DEVICE_INFO_VERSION;
+     m_info.struct_size = sizeof(m_info);
+     const auto infoStatus = m_api.info(m_device, &m_info);
++    // A native backend may report apiVersion 0 when it cannot determine the
++    // Vulkan API version. Qt rejects a zero VkApplicationInfo::apiVersion and
++    // silently falls back to software rendering, so clamp to the lowest version
++    // this adoption path can work with before validating or adopting.
++    if (infoStatus == OPENNOW_STREAMER_OK && m_info.api_version < VK_API_VERSION_1_1)
++        m_info.api_version = VK_API_VERSION_1_1;
+     if (infoStatus != OPENNOW_STREAMER_OK || !validInfo(m_info)) {
+         m_lastError = QStringLiteral("The native Vulkan device returned incompatible device information (status %1).")
+                           .arg(int(infoStatus));
