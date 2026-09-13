@@ -13,8 +13,9 @@ SRCREV = "34afc8345504956ec4d5c6a5a3933bc7922e7599"
 SRC_URI += "file://0002-streamer-ffmpeg6-queue-families.patch"
 SRC_URI += "file://0003-streamer-vulkan-device-ffmpeg6.patch"
 SRC_URI += "file://0004-opennow-qt-prebuilt-rust.patch"
+SRC_URI += "file://0005-opennow-qt-vulkan-extension-filter.patch"
 
 S = "${WORKDIR}/git"
 
-OPENNOW_VERSION = "1.0.0"
+OPENNOW_VERSION = "1.0.1"
 PV = "${OPENNOW_VERSION}+git"
