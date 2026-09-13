@@ -9,10 +9,10 @@ The layer is a Scarthgap-port of upstream OpenNOW's Yocto work (PR
 `dev` branch era of the project). The upstream PR tracked Yocto Wrynose and
 shipped Rust 1.94 / Qt 6.11 via meta-qt6 master; this layer re-targets
 Scarthgap with Qt 6.8 (meta-qt6 `6.8` branch) and a prebuilt Rust toolchain
-(meta-rust-bin, Rust 1.94) and adapts the decode backend for boards without
-VAAPI (e.g. STM32MP25, which has no VAAPI driver — it uses the ffmpeg backend
-instead). The OpenNOW revision is pinned to the project's `main` branch
-(see below).
+(meta-rust-bin; validated with Rust 1.98.1, OpenNOW requires >= 1.85) and
+adapts the decode backend for boards without VAAPI (e.g. STM32MP25, which has
+no VAAPI driver — it uses the ffmpeg backend instead). The OpenNOW revision
+is pinned to the project's `main` branch (see below).
 
 ## Layer dependencies
 
@@ -21,7 +21,7 @@ instead). The OpenNOW revision is pinned to the project's `main` branch
 | openembedded-core  | `core`         | Scarthgap (must match build distro)     |
 | meta-openembedded  | `openembedded-layer`, `meta-python` | Scarthgap |
 | meta-qt6           | `qt6-layer`    | `6.8` branch (Qt 6.8.4, scarthgap in LAYERSERIES_COMPAT) |
-| meta-rust-bin      | `rust-bin-layer` | prebuilt rustc/cargo 1.94.0 via `cargo_bin` class |
+| meta-rust-bin      | `rust-bin-layer` | prebuilt rustc/cargo via `cargo_bin` class; Rust >= 1.85, validated with 1.98.1 |
 | meta-clang         | `clang-layer`  | `scarthgap` branch (bindgen needs `clang-native`) |
 
 `LAYERDEPENDS_opennow = "core openembedded-layer meta-python qt6-layer rust-bin-layer clang-layer"`
@@ -71,12 +71,30 @@ bitbake opennow-image        # or your own image with `opennow` installed
   `OPENNOW_RUST_FEATURES = "linux-ffmpeg,linux-vaapi"` (add `libva` to
   DEPENDS then). STM32MP25 stays on `linux-ffmpeg`.
 * **Rust toolchain** — meta-rust-bin provides several versions; bump by
-  adding `rust-bin-cross_<ver>.bb` / `cargo-bin-cross_<ver>.bb` and setting
-  `PREFERRED_VERSION` if needed. OpenNOW requires Rust >= 1.85.
+  setting `PREFERRED_VERSION_rust` / `PREFERRED_VERSION_cargo` in `local.conf`
+  (or adding `rust-bin-cross_<ver>.bb` / `cargo-bin-cross_<ver>.bb`).
+  OpenNOW requires Rust >= 1.85; validated with 1.98.1.
 * **OpenNOW revision / crates** — with an OpenNOW checkout:
   `scripts/update-sources.py --revision <commit>` regenerates
   `opennow-crates.inc`, `opennow-sdl.inc`, `opennow-source.inc`;
   `--check` (and `tests/test_sources.py`) verifies they are current.
+
+## Validated build
+
+Successfully built (all 11798 tasks, no errors) as part of a full
+`st-image-weston` image for the `watermelon-wine-1a` machine (STM32MP25,
+aarch64/ARM Cortex-A35, OpenSTLinux Weston distro):
+
+| Component | Version |
+|-----------|---------|
+| OpenNOW    | `c1ca719` (1.0.0 release line, `main` branch) |
+| Qt        | 6.8.x via meta-qt6 `6.8` branch |
+| Rust      | 1.98.1 (meta-rust-bin `cargo_bin`/`rust_bin`) |
+| FFmpeg    | 6.x from the ST layer (decode backend: `linux-ffmpeg`, no VAAPI on mp25) |
+
+The resulting rootfs ships `opennow-qt`, `opennow-core`,
+`opennow-streamer`, `opennow-update-helper`, `opennow-acceptance-verify`,
+`libopennow_streamer_ffi.so`, the `.desktop` entry and icon.
 
 ## Offline / reproducibility notes
 
