@@ -3,7 +3,7 @@ LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=efa1357149ea0c1589fb5abd29da41b4"
 
 SRC_URI = "git://github.com/opencloudgaming/opennow.git;protocol=https;nobranch=1"
-SRCREV = "c1ca71929249788bdef799202eb94660a7799ac2"
+SRCREV = "34afc8345504956ec4d5c6a5a3933bc7922e7599"
 
 # opennow-streamer-platform-linux's FFmpeg Vulkan backend is written against the
 # bundled FFmpeg headers; the distribution FFmpeg (6.x) reworked
