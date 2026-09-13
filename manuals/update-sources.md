@@ -24,7 +24,7 @@ python3 scripts/update-sources.py --revision <commit> [--opennow-root /path/to/O
 ```
 
 This re-pins `opennow-source.inc` and regenerates `opennow-crates.inc` /
-`opennow-sdl.inc` from that revision's `Cargo.lock` files Alert text.
+`opennow-sdl.inc` from that revision's `Cargo.lock` files.
 
 ## Verifying the pins are current
 
