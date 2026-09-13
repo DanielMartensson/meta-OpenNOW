@@ -20,4 +20,4 @@ EXTRA_OECMAKE += "-DBUILD_TESTING=OFF \
 RDEPENDS:${PN} += "ca-certificates qtbase-plugins qtdeclarative-qmlplugins \
     qtmultimedia-plugins qtmultimedia-qmlplugins qtsvg-plugins qtwayland-plugins"
 FILES:${PN} += "${bindir}/libopennow_streamer_ffi.so ${datadir}/metainfo \
-    ${datadir}/icons/hicolor/scalable/apps"
+    ${datadir}/icons/hicolor/*/apps"
