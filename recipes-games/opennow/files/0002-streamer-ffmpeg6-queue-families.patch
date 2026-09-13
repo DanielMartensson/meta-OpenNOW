@@ -1,0 +1,46 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Watermelon OS <build@watermelon-wine-1a>
+Date: Sat, 12 Sep 2026 08:55:00 +0200
+Subject: [PATCH] streamer: compile the Vulkan frame-export path against FFmpeg 6.x
+
+opennow-streamer-platform-linux's ffmpeg backend unconditionally type-checks
+`map_vulkan_frame_direct()`, which touches the old pre-rename layout of
+`AVVulkanDeviceContext` (`nb_qf`/`qf` queue-family array) and reads
+`AVVkFrame.access` as u64. The distribution FFmpeg 6.x reworked the device
+context to scalar queue-family counters and removed the array, so the module
+fails to compile against system headers.
+
+On STM32MP25 the streamer-side Vulkan path is never used (the `vulkan` feature
+is disabled and the pixel pipeline is software/V4L2), so these expressions only
+need to type-check. Pass an empty queue-family list (modern FFmpeg enumerates
+them from the device) and widen the access flags.
+
+Upstream-Status: Inappropriate [OpenNOW-specific build integration]
+---
+diff --git a/native/opennow-streamer/crates/opennow-streamer-platform-linux/src/video/ffmpeg.rs b/native/opennow-streamer/crates/opennow-streamer-platform-linux/src/video/ffmpeg.rs
+index 3fac3f4b..cb4d0a90 100644
+--- a/native/opennow-streamer/crates/opennow-streamer-platform-linux/src/video/ffmpeg.rs
++++ b/native/opennow-streamer/crates/opennow-streamer-platform-linux/src/video/ffmpeg.rs
+@@ -625,18 +625,13 @@ fn map_vulkan_frame_direct(
+             width: plane_width,
+             height: plane_height,
+             layout: unsafe { (*vulkan_frame).layout[index] },
+-            access: unsafe { (*vulkan_frame).access[index] },
++            access: unsafe { (*vulkan_frame).access[index] as u64 },
+             semaphore: unsafe { (*vulkan_frame).sem[index] },
+             semaphore_value: unsafe { (*vulkan_frame).sem_value[index] },
+             queue_family: unsafe { (*vulkan_frame).queue_family[index] },
+         });
+     }
+-    let queue_count = unsafe { (*vulkan_device).nb_qf.max(0) as usize };
+-    let queue_families =
+-        unsafe { &(&(*vulkan_device).qf)[..queue_count.min((*vulkan_device).qf.len())] }
+-            .iter()
+-            .filter_map(|family| u32::try_from(family.idx).ok())
+-            .collect::<Vec<_>>();
++    let queue_families = Vec::new();
+     let mut retained = frame::Video::empty();
+     if unsafe { ffi::av_frame_ref(retained.as_mut_ptr(), decoded.as_ptr()) } < 0 {
+         return Err(Error::backend(
+-- 
+2.43.0
