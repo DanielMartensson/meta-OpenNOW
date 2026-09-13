@@ -41,43 +41,154 @@ is pinned to the project's `main` branch (see below).
 * To include OpenNOW in an existing (e.g. static ST) image, add `opennow`
   to `CORE_IMAGE_EXTRA_INSTALL`.
 
-## Build integration
+## OpenSTLinux integration manual
+
+Step-by-step instructions for adding the OpenNOW client to your own
+OpenSTLinux distribution (validated on the STMicroelectronics STM32MP25
+MPU, `openstlinux-weston` distro, aarch64).
+
+### 1. Host prerequisites
+
+ST's standard build host packages (Ubuntu 22.04/24.04, Debian or Mint)
+from the *OpenSTLinux Getting Started* list — `expect`, `gawk`, `git`,
+`python3`, etc. — plus roughly 100 GB free disk. Rust, Qt and the C++
+toolchain are all provided *inside* the Yocto build; nothing extra is
+installed on the host.
+
+### 2. Unpack the ST source package
+
+Download the ST source package for your MPU (e.g. *STM32MP25 Ecosystem
+Release*, "Developer Package / Sources") and unpack it. From here on all
+commands run inside that tree (it contains `layers/`, `setup.sh`, etc.):
 
 ```bash
-# layers/ (repo-manifest siblings)
-git clone --depth 1 -b 6.8      https://code.qt.io/yocto/meta-qt6.git      meta-qt6
-git clone --depth 1             https://github.com/rust-embedded/meta-rust-bin.git meta-rust-bin
-git clone --depth 1 -b scarthgap https://github.com/kraj/meta-clang.git     meta-clang
+cd <STM32MP25-source-tree>        # contains layers/meta-st/scripts/envsetup.sh
+source layers/meta-st/scripts/envsetup.sh --no-ui build-openstlinuxweston-stm32mp25-<board> < <(yes y)
+```
 
-# bblayers.conf — append these alongside the existing layers
-BBLAYERS += " <path>/meta-opennow <path>/meta-qt6 <path>/meta-rust-bin <path>/meta-clang "
+### 3. Add this layer and its dependencies
 
-# local.conf
-LICENSE_FLAGS_ACCEPTED += "commercial"   # ffmpeg is a DEPENDS of opennow-runtime
+Clone everything into the source tree's `layers/` directory:
+
+```bash
+cd layers
+git clone https://github.com/<you>/meta-OpenNOW.git meta-opennow
+git clone --depth 1 -b 6.8        https://code.qt.io/yocto/meta-qt6.git meta-qt6
+git clone --depth 1               https://github.com/rust-embedded/meta-rust-bin.git meta-rust-bin
+git clone --depth 1 -b scarthgap  https://github.com/kraj/meta-clang.git meta-clang
+# meta-openembedded (openembedded-layer, meta-python) normally comes with ST's
+# package; only add it if it is missing from your tree.
+```
+
+`opennow-core` also links the SDL2 Rust crates (`zortos293/rust-sdl2`)
+and the Qt app links **libsdl3**; if your BSP provides `libsdl3` it is used
+directly, otherwise provide it (the validating build used the
+`meta-watermelon-wine` BSP layer for `libsdl3_3.4.14`).
+
+### 4. Register the layers in bblayers.conf
+
+Edit `<builddir>/conf/bblayers.conf` and append:
+
+```bash
+BBLAYERS += " <tree>/layers/meta-opennow <tree>/layers/meta-qt6 <tree>/layers/meta-rust-bin <tree>/layers/meta-clang "
+```
+
+### 5. Required settings in local.conf
+
+```bash
+# opennow recipes require opengl, vulkan and wayland
 DISTRO_FEATURES:append = " opengl vulkan wayland"
+# ffmpeg is a DEPENDS of opennow-runtime (commercial FLOSS license flag)
+LICENSE_FLAGS_ACCEPTED += "commercial"
+# pull the client into the image
 CORE_IMAGE_EXTRA_INSTALL:append = " opennow"
+
+# optional, recommended for repeatable builds:
+PREFERRED_VERSION_rust = "1.98.1"
+PREFERRED_VERSION_cargo = "1.98.1"
+# optional, weak hosts only (the validating environment built with -j1):
+# BB_NUMBER_THREADS = "1"
+# PARALLEL_MAKE = "-j 1"
 ```
 
-Then:
+### 6. Build
 
 ```bash
-bitbake opennow-image        # or your own image with `opennow` installed
+bitbake st-image-weston      # your ST image, or simply:
+bitbake opennow-image        # minimal reference image with OpenNOW
 ```
+
+The rootfs/image artifacts land in
+`tmp-glibc/deploy/images/<machine>/` and are flashed exactly like a stock
+OpenSTLinux image (STM32CubeProgrammer, `flashlayout`, `stm32mp-signing`,
+...).
+
+### 7. What you must change for *your* board
+
+* **Machine type** — `COMPATIBLE_HOST = "(x86_64|aarch64).*-linux$"` allows
+  aarch64 targets and the x86_64 native recipes. 32-bit SoCs (STM32MP13x,
+  STM32MP15x, ARMv7) are **not** supported out of the box; extend the
+  pattern (e.g. `arm`) in every recipe if you need them (untested).
+* **Decode backend** — default `OPENNOW_RUST_FEATURES ??= "linux-ffmpeg"`
+  (software/v4l2, no VAAPI on STM32MP2x). Boards **with** VAAPI:
+  `OPENNOW_RUST_FEATURES = "linux-ffmpeg,linux-vaapi"` in `opennow-runtime.bb`
+  and add `libva` to its `DEPENDS`.
+* **GPU userland** — on STM32MP2x ensure the Vivante gcnano userland
+  (`gcnano-userland-*`) is in your image so Qt/OpenGL/Vulkan can render.
+* **Rust version** — meta-rust-bin ships several toolchains; pin with
+  `PREFERRED_VERSION`. OpenNOW requires >= 1.85 (validated with 1.98.1).
+* **OpenNOW revision / crates** — 
+  `scripts/update-sources.py --revision <commit>` regenerates
+  `opennow-crates.inc` / `opennow-sdl.inc` / `opennow-source.inc`;
+  `--check` (and `tests/test_sources.py`) verifies they are current.
+* **Your own image** — copy `recipes-core/images/opennow-image.bb` and add
+  `opennow` to `IMAGE_INSTALL`.
+
+### 8. How the offline crate flow works
+
+`opennow-crates.inc` lists every crate as `crate://crates.io/<name>/<ver>`
+with a sha256 (do_fetch is the *only* task allowed to touch the network).
+The fetcher unpacks them straight into `${CARGO_HOME}/bitbake` and
+`classes/opennow-cargo.bbclass` writes a cargo config that replaces
+`crates-io` with that directory and forces `--frozen` + offline resolution,
+so `do_compile` never touches the network. A shared `downloads/` directory
+(or git mirror) lets you rebuild fully offline afterwards.
+
+### 9. Runtime
+
+Boot the built image and start the client:
+
+```bash
+opennow-qt
+```
+
+The image ships `opennow-qt`, `opennow-core`, `opennow-streamer`,
+`opennow-update-helper`, `opennow-acceptance-verify`,
+`libopennow_streamer_ffi.so`, plus the `.desktop` entry and icon.
+
+### 10. Troubleshooting
+
+* `opennow:do_configure` fails with a `libva`/`libdrm` pkg-config error —
+  the prebuilt-mode guard did not see `OPENNOW_PREBUILT_NATIVE_DIR`; make
+  sure `opennow-runtime` built first and the dir exists in the recipe
+  sysroot (`recipe-sysroot/usr/lib/opennow-native/`).
+* `cargo: command not found` / Cargo invoked from CMake — prebuilt mode is
+  off; re-check the `-DOPENNOW_PREBUILT_NATIVE_DIR=${STAGING_LIBDIR}/opennow-native`
+  argument in `opennow.bb`.
+* `FFAPI / AVVulkanDeviceContext` compile errors — you are building against
+  FFmpeg 5 (`libavcodec.so.59`); the FFmpeg 6.x patches (0002/0003) expect
+  the STM32MP2 FFmpeg 6.x tree.
+* `commercial` license flag not accepted — ffmpeg will refuse to build;
+  add `LICENSE_FLAGS_ACCEPTED += "commercial"`.
+* Booting with black/blank frame or QML errors — check the gcnano GPU
+  userland packagegroup and that `opengl`, `vulkan`, `wayland` distro
+  features are enabled.
+* Qt lookup errors on the target — ensure `qtbase-plugins`,
+  `qtdeclarative-qmlplugins`, `qtmultimedia-plugins/-qmlplugins`,
+  `qtsvg-plugins` and `qtwayland-plugins` are in the image (they are
+  `RDEPENDS` of the `opennow` package).
 
 ## Adapting
-
-* **Decode backend** — `OPENNOW_RUST_FEATURES ??= "linux-ffmpeg"` in
-  `opennow-runtime.bb`. Boards with VAAPI can set
-  `OPENNOW_RUST_FEATURES = "linux-ffmpeg,linux-vaapi"` (add `libva` to
-  DEPENDS then). STM32MP25 stays on `linux-ffmpeg`.
-* **Rust toolchain** — meta-rust-bin provides several versions; bump by
-  setting `PREFERRED_VERSION_rust` / `PREFERRED_VERSION_cargo` in `local.conf`
-  (or adding `rust-bin-cross_<ver>.bb` / `cargo-bin-cross_<ver>.bb`).
-  OpenNOW requires Rust >= 1.85; validated with 1.98.1.
-* **OpenNOW revision / crates** — with an OpenNOW checkout:
-  `scripts/update-sources.py --revision <commit>` regenerates
-  `opennow-crates.inc`, `opennow-sdl.inc`, `opennow-source.inc`;
-  `--check` (and `tests/test_sources.py`) verifies they are current.
 
 ## Validated build
 
