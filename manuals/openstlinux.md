@@ -126,8 +126,12 @@ rebuild fully offline.
 Boot the built image and start the client:
 
 ```bash
+export LC_ALL=C.UTF-8   # Qt requires a UTF-8 locale; glibc ships C.UTF-8 out of the box
 opennow-qt
 ```
+
+The bare `C`/`ANSI_X.4-1968` locale makes Qt print a startup warning; the
+export above silences it. No locale package needs installing.
 
 The image ships `opennow-qt`, `opennow-core`, `opennow-streamer`,
 `opennow-update-helper`, `opennow-acceptance-verify`, the
@@ -152,6 +156,13 @@ The image ships `opennow-qt`, `opennow-core`, `opennow-streamer`,
   `LICENSE_FLAGS_ACCEPTED += "commercial"`.
 * **Blank/black frame or Vulkan/QML errors** — check the gcnano GPU userland
   packagegroup and that `opengl`, `vulkan`, `wayland` distro features are on.
+* **`Cannot allocate memory` / `Embedded vulkan unavailable` at startup** — the
+  gcnano Vulkan ICD is installed and registered
+  (`/etc/vulkan/icd.d/VeriSilicon_icd.json` → `libvulkan_gcnano.so`), but the
+  driver can fail `vkCreateDevice` when GPU/CMA memory is tight; Qt then falls
+  back to OpenGL ES and the client keeps working. To investigate on the board:
+  `ls -l /dev/galcore`, `dmesg | grep -i gcnano`, and check the `cma=` size on
+  the kernel command line.
 * **Qt lookup errors on target** — ensure `qtbase-plugins`,
   `qtdeclarative-qmlplugins`, `qtmultimedia-plugins/-qmlplugins`,
   `qtsvg-plugins` and `qtwayland-plugins` are in the image (they are
