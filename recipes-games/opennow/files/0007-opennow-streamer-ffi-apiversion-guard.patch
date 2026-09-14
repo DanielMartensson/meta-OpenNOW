@@ -28,7 +28,7 @@ index 0a440e33..1528e5ab 100644
 +        // to the lowest API the adopted pipeline is built against, regardless
 +        // of the underlying driver or vendor.
 +        if info.api_version == 0 {
-+            info.api_version = vk::API_VERSION_1_1;
++            info.api_version = ash::vk::API_VERSION_1_1;
 +        }
 +        info
      }
