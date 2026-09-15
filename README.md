@@ -17,21 +17,32 @@ Linux (aarch64 / x86_64 only).
 
 ## Dependencies
 
-This layer depends on the following layers:
+This is the complete, minimal set — every entry is required:
 
-| Layer             | Collection (branch)    | Notes |
-|-------------------|------------------------|-------|
-| openembedded-core | `core` (scarthgap)     | must match your distro |
-| meta-openembedded | `openembedded-layer`, `meta-python` (scarthgap) | |
-| meta-qt6          | `qt6-layer` (6.8)      | Qt 6.8.x |
-| meta-rust-bin     | `rust-bin-layer`       | prebuilt rustc/cargo (`cargo_bin`), Rust >= 1.85 (validated 1.98.1) |
-| meta-clang        | `clang-layer`          | bindgen needs `clang-native` |
+| Layer             | Collection (branch)      | Why it is needed |
+|-------------------|--------------------------|------------------|
+| openembedded-core | `core` (scarthgap)       | base recipes and classes |
+| meta-openembedded | `openembedded-layer`, `meta-python` (scarthgap) | required by **meta-qt6**; `openembedded-layer` also provides `libsdl3` (gamepad input) |
+| meta-qt6          | `qt6-layer` (6.8)        | `qt6-cmake` + Qt 6.8 modules (`qtdeclarative`, `qtmultimedia`, ...) |
+| meta-rust-bin     | `rust-bin-layer`         | `cargo_bin` prebuilt rustc/cargo for the Rust runtime (>= 1.85) |
+| meta-clang        | `clang-layer`            | `clang-native`, used by bindgen at build time |
 
 Declared in `conf/layer.conf`:
 
 ```bitbake
 LAYERDEPENDS_opennow = "core openembedded-layer meta-python qt6-layer rust-bin-layer clang-layer"
 ```
+
+Notes:
+
+* `openembedded-layer`/`meta-python` are not optional extras — **meta-qt6**
+  itself declares `LAYERDEPENDS_qt6-layer = "core openembedded-layer meta-python"`,
+  so they are pulled in transitively even before this layer is considered.
+* `libsdl3` ships in `openembedded-layer` on current meta-openembedded
+  branches. If your pinned branch predates it, provide the recipe in a BSP
+  layer instead (see `manuals/openstlinux.md`).
+* No other packages or layers are needed; Qt6 does the rendering
+  (Vulkan/OpenGL ES), SDL3 only handles gamepad input.
 
 ## Distro features and license flags
 
