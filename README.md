@@ -5,10 +5,6 @@ Yocto/OpenEmbedded layer that builds the
 Qt 6 Quick shell with a Rust native runtime — and packages it for embedded
 Linux (aarch64 / x86_64 only).
 
-OpenNOW is taken from upstream `v1.0.1`; no fork and no patches are applied.
-All Rust crates (`opennow-crates.inc`) and the SDL2 fork (`opennow-sdl.inc`)
-are pinned and fetched offline.
-
 ## Table of contents
 
 1. [Dependencies](#dependencies)
