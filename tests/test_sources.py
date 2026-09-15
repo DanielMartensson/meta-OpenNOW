@@ -4,9 +4,20 @@ import tempfile
 import unittest
 
 
-ROOT = Path(__file__).resolve().parents[2]
+def _layer_root():
+    path = Path(__file__).resolve().parents[0]
+    while not (path / "scripts" / "update-sources.py").exists():
+        parent = path.parent
+        if parent == path:
+            raise FileNotFoundError("update-sources.py not found in an ancestor of tests/")
+        path = parent
+    return path
+
+
+LAYER = _layer_root()
+ROOT = LAYER.parent
 SPEC = importlib.util.spec_from_file_location(
-    "update_sources", ROOT / "meta-opennow/scripts/update-sources.py"
+    "update_sources", LAYER / "scripts/update-sources.py"
 )
 SOURCES = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(SOURCES)
@@ -83,7 +94,7 @@ class SourceMetadataTests(unittest.TestCase):
                          "OpenNOW source checkout not found at ROOT")
     def test_generated_repository_metadata_is_current(self):
         for name, expected in SOURCES.render_crates(ROOT).items():
-            self.assertEqual((ROOT / "meta-opennow/recipes-games/opennow" / name).read_text(), expected)
+            self.assertEqual((LAYER / "recipes-games/opennow" / name).read_text(), expected)
 
 
 if __name__ == "__main__":

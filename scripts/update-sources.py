@@ -67,7 +67,7 @@ def main():
     root = args.opennow_root or default_root
     if root is None:
         parser.error("meta-opennow must be used inside an OpenNOW checkout or --opennow-root given")
-    recipes = root / "meta-opennow/recipes-games/opennow"
+    recipes = Path(__file__).resolve().parents[1] / "recipes-games/opennow"
     outputs = render_crates(root)
     source_path = recipes / "opennow-source.inc"
     source = source_path.read_text()
