@@ -47,8 +47,8 @@ git clone --depth 1               https://github.com/rust-embedded/meta-rust-bin
 git clone --depth 1 -b scarthgap  https://github.com/kraj/meta-clang.git meta-clang
 # meta-openembedded (openembedded-layer, meta-python) ships with ST's package
 # by default; add it only if it is missing from your tree.
-# libsdl3 needed by opennow-qt: provide a recipe (not in stock ST tree) —
-# the validating build used a libsdl3_3.4.14 from the BSP layer.
+# libsdl3 ships in this layer (recipes-graphics/libsdl3), so nothing else is
+# needed.
 ```
 
 ## 4. Register the layers

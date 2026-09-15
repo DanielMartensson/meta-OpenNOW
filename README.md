@@ -22,7 +22,7 @@ This is the complete, minimal set — every entry is required:
 | Layer             | Collection (branch)      | Why it is needed |
 |-------------------|--------------------------|------------------|
 | openembedded-core | `core` (scarthgap)       | base recipes and classes |
-| meta-openembedded | `openembedded-layer`, `meta-python` (scarthgap) | required by **meta-qt6**; `openembedded-layer` also provides `libsdl3` (gamepad input) |
+| meta-openembedded | `openembedded-layer`, `meta-python` (scarthgap) | required by **meta-qt6** |
 | meta-qt6          | `qt6-layer` (6.8)        | `qt6-cmake` + Qt 6.8 modules (`qtdeclarative`, `qtmultimedia`, ...) |
 | meta-rust-bin     | `rust-bin-layer`         | `cargo_bin` prebuilt rustc/cargo for the Rust runtime (>= 1.85) |
 | meta-clang        | `clang-layer`            | `clang-native`, used by bindgen at build time |
@@ -38,9 +38,12 @@ Notes:
 * `openembedded-layer`/`meta-python` are not optional extras — **meta-qt6**
   itself declares `LAYERDEPENDS_qt6-layer = "core openembedded-layer meta-python"`,
   so they are pulled in transitively even before this layer is considered.
-* `libsdl3` ships in `openembedded-layer` on current meta-openembedded
-  branches. If your pinned branch predates it, provide the recipe in a BSP
-  layer instead (see `manuals/openstlinux.md`).
+* This layer ships its own minimal `libsdl3` recipe
+  (`recipes-graphics/libsdl3`) because OpenNOW links SDL3 for gamepad input,
+  yet the `libsdl3` recipe only exists on current meta-openembedded master.
+  It is Wayland-only and patch-free: `check_symbol_exists()` misses glibc
+  extensions (notably `getresuid`) unless `_GNU_SOURCE` is passed via
+  `CMAKE_REQUIRED_DEFINITIONS`, which the recipe's `EXTRA_OECMAKE` does.
 * No other packages or layers are needed; Qt6 does the rendering
   (Vulkan/OpenGL ES), SDL3 only handles gamepad input.
 
@@ -76,6 +79,7 @@ LICENSE_FLAGS_ACCEPTED += "commercial"
 | `opennow-runtime`             | `opennow-core` + `opennow-streamer` (Rust, offline); installs the ffmpeg-FFI static/shared libs into `${libdir}/opennow-native` |
 | `opennow-license-report-native` | host tool that generates `THIRD_PARTY_NOTICES.generated` |
 | `opennow`                     | the Qt shell (`opennow-qt`) that links the prebuilt runtime |
+| `libsdl3`                     | minimal Wayland-only SDL 3.4.14 build (`recipes-graphics/libsdl3`); OpenNOW links it for gamepad input |
 | `opennow-image`               | minimal reference image |
 
 ## Usage
